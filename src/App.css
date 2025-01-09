@@ -20,3 +20,7 @@
 .animate-explosion {
   animation: explosion 1.5s ease-out forwards;
 }
+
+*{
+  user-select: none;
+}

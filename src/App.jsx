@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css'
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI('AIzaSyDaaef5eoNhHQxEgRW46_xy3X02REdF5zw');
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+
+
 const App = () => {
   const [buttons, setButtons] = useState([{ id: 'main', position: { x: 50, y: 50 }, z: 0, rotateX: 0, rotateY: 0, scale: 1 }]);
   const [score, setScore] = useState(0);
@@ -16,6 +22,57 @@ const App = () => {
   const [vortexAngle, setVortexAngle] = useState(0);
   const [buttonText, setButtonText] = useState("Try to Click Me! 😈");
   const lastTauntTime = useRef(Date.now());
+
+  const [aiMessages, setAiMessages] = useState([]);
+  const [gameContext, setGameContext] = useState({
+    playerStyle: 'unknown',
+    frustrationLevel: 0,
+    successRate: 0,
+  });
+
+  
+  const generateAIResponse = async (context) => {
+    try {
+      const styles = [
+        "Keep encouraging them like a cheerleader 🎉",
+        "Tease them playfully, like a mischievous friend 😜",
+        "Be diabolically evil and taunting 👿"
+      ];
+      const style = styles[Math.floor(Math.random() * styles.length)];
+      
+      const prompt = `
+        As an AI in an impossible button game, generate a witty and playful taunt for the player:
+        - Total Successes: ${context.score}
+        - Total Failures: ${context.failureCount}
+        - Style: ${style} Be really random and don't repeat
+        - Response must be under 60 characters and include one emoji if possible.
+      `;
+
+      const result = await model.generateContent(prompt);
+      const taunt = result.response.text();
+      setAiMessages(prev => [...prev, taunt].slice(-5)); // Keep last 5 taunts
+      return taunt;
+    } catch (error) {
+      console.error('AI generation error:', error);
+      return evilTaunts[Math.floor(Math.random() * evilTaunts.length)];
+    }
+  };
+
+  const analyzePlayerBehavior = useCallback(() => {
+    const style = failureCount > 20 ? 'persistent' :
+                 score > 10 ? 'skilled' :
+                 timeWarp > 2 ? 'improving' : 'learning';
+    
+    const frustration = Math.min(10, Math.floor(failureCount / 10));
+    const successRate = score > 0 ? Math.round((score / (score + failureCount)) * 100) : 0;
+
+    setGameContext({
+      playerStyle: style,
+      frustrationLevel: frustration,
+      successRate: successRate,
+    });
+  }, [failureCount, score, timeWarp]);
+
 
   const evilTaunts = [
     "Too slow! 🏃‍♂️",
@@ -55,7 +112,7 @@ const App = () => {
     }
   };
 
-  const handleClick = useCallback((buttonId) => {
+  const handleClick = useCallback(async (buttonId) => {
     setScore(prev => prev + 1);
     setBestScore(prev => Math.max(prev, score + 1));
     setTimeWarp(prev => prev * 1.2);
@@ -64,10 +121,16 @@ const App = () => {
     if (button) {
       createVisualEffect(button.position.x, button.position.y, 'explosion');
     }
-    
-    updateButtonText("IMPOSSIBLE! 🤯");
-    setTimeout(() => updateButtonText(evilTaunts[Math.floor(Math.random() * evilTaunts.length)]), 2000);
-  }, [buttons, score]);
+
+    analyzePlayerBehavior();
+    const aiTaunt = await generateAIResponse(gameContext);
+    updateButtonText(aiTaunt);
+
+    if (score > 5 && gameContext.successRate > 70) {
+      setTimeWarp(prev => prev * 1.1);
+      setDistortionEffect(prev => Math.min(0.9, prev + 0.1));
+    }
+  }, [buttons, score, gameContext]);
 
   const createVisualEffect = (x, y, type = 'default') => {
     const effect = {
@@ -174,9 +237,18 @@ const App = () => {
         <span>Best: {bestScore}</span>
       </div>
 
+      <div className="fixed top-2 left-2 w-64 bg-black/80 rounded-lg p-4 text-white">
+        <h3 className="text-sm font-bold mb-2">AI Messages:</h3>
+        {aiMessages.map((taunt, index) => (
+          <div key={index} className="text-sm opacity-90 mb-1">
+            {taunt}
+          </div>
+        ))}
+      </div>
+
       <div 
         ref={containerRef}
-        className="relative w-full max-w-4xl h-[600px] bg-gradient-to-br from-gray-900/50 to-black/50 rounded-xl overflow-hidden backdrop-blur-sm border border-purple-500/30"
+        className="relative w-full max-w-3xl h-[600px] bg-gradient-to-br from-gray-900/50 to-black/50 rounded-xl overflow-hidden backdrop-blur-sm border border-purple-500/30"
         onMouseMove={handleMouseMove}
         style={{
           perspective: '1200px',
