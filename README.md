@@ -18,7 +18,7 @@ An interactive React game featuring a button that dynamically evades your cursor
 ## Quick Start 🚀
 
 ```bash
-git clone [repository-url]
+git clone https://github.com/ObayM/Impossible-button
 cd Impossible-button
 npm install
 npm start
